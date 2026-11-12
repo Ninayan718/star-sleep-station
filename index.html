@@ -34,7 +34,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .s3 { top: 6%; left: 84%; animation-delay: 2.2s; } .s4 { top: 28%; left: 31%; animation-delay: .7s; }
 .s5 { top: 34%; left: 91%; animation-delay: 1.8s; } .s6 { top: 43%; left: 8%; animation-delay: 3s; }
 .s7 { top: 12%; left: 43%; animation-delay: 2.6s; } .s8 { top: 51%; left: 74%; animation-delay: 1.4s; }
-.moon-svg { position: absolute; top: 14%; right: 7%; width: 38px; height: 38px; opacity: .80; filter: drop-shadow(0 0 14px rgba(255, 236, 197, .50)); }
+.hero-moon { position: absolute; top: 48px; left: 20px; width: 30px; height: 30px; opacity: .82; filter: drop-shadow(0 0 12px rgba(255, 236, 197, .50)); }
 
 .shell { position: relative; z-index: 1; max-width: 480px; margin: 0 auto; min-height: 100vh; }
 .topbar {
@@ -55,6 +55,7 @@ button { -webkit-tap-highlight-color: transparent; }
 
 /* 主视觉 */
 .hero {
+  position: relative;
   background: rgba(255, 255, 255, .10); border: 1px solid rgba(255, 255, 255, .18);
   backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
   border-radius: 24px; padding: 16px 18px 22px; text-align: center;
@@ -83,6 +84,13 @@ button { -webkit-tap-highlight-color: transparent; }
 .row-note { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: #E6EAF7; padding: 9px 4px 14px; }
 .link-btn { background: none; border: 0; color: #FFE0B6; font-size: 12px; text-decoration: underline; cursor: pointer; padding: 4px; }
 .danger-link { color: #D7A6A6; display: block; margin-top: 12px; }
+.undo-bar {
+  display: flex; align-items: center; gap: 8px; width: 100%; margin: 0 0 12px; padding: 11px 14px;
+  background: rgba(255, 233, 196, .16); border: 1px solid rgba(255, 233, 196, .40);
+  border-radius: 14px; color: #FFE9C4; font-size: 12.5px; text-align: left; cursor: pointer;
+}
+.undo-bar .ic { width: 15px; height: 15px; }
+.undo-bar:active { transform: scale(.99); }
 
 /* 卡片 */
 .card { background: #FFF8EE; color: #2C3550; border-radius: 20px; padding: 16px 16px 15px; margin-bottom: 14px; box-shadow: 0 6px 20px rgba(14, 22, 48, .18); }
@@ -224,7 +232,6 @@ button { -webkit-tap-highlight-color: transparent; }
   <span class="star s1"></span><span class="star s2"></span><span class="star s3"></span>
   <span class="star s4"></span><span class="star s5"></span><span class="star s6"></span>
   <span class="star s7"></span><span class="star s8"></span>
-  <svg class="moon-svg" viewBox="0 0 60 60" aria-hidden="true"><defs><mask id="xmMoonMask"><rect width="60" height="60" fill="#000"/><circle cx="30" cy="30" r="24" fill="#fff"/><circle cx="42" cy="21" r="21" fill="#000"/></mask></defs><rect width="60" height="60" fill="#FFF0CC" mask="url(#xmMoonMask)"/></svg>
 </div>
 <div class="shell">
   <header class="topbar">
@@ -270,6 +277,12 @@ function svg(name, cls) {
 }
 
 var TAB_ICONS = { today: 'moon', log: 'calendar', collection: 'jar', settings: 'sliders' };
+
+/* 弯月：放进主卡片里，跟着卡片走，不会压到日期文字 */
+var MOON_SVG = '<svg class="hero-moon" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'
+  + '<defs><mask id="xmMoonMask"><rect width="60" height="60" fill="#000"/>'
+  + '<circle cx="30" cy="30" r="24" fill="#fff"/><circle cx="42" cy="21" r="21" fill="#000"/></mask></defs>'
+  + '<rect width="60" height="60" fill="#FFF0CC" mask="url(#xmMoonMask)"/></svg>';
 
 var QUESTS = [
   { id: 'curtain', text: '拉开窗帘，让光先进来' },
@@ -446,7 +459,7 @@ function monsterSvg(mood) {
       v: 1, created: todayStr(),
       settings: { bedTarget: '23:00', wakeTarget: '07:00', dayCut: '04:00', roommateOn: true, roommate: '阿月', theme: 'dawn' },
       nights: {}, coins: 0, coinLog: [], fragments: [], stickers: [], skins: ['sk_dawn'],
-      rewards: [], contract: null, vouchers: [], badges: [], roomSeen: {}
+      rewards: [], contract: null, vouchers: [], badges: [], roomSeen: {}, undo: null
     };
   }
   function normalize(o) {
@@ -466,6 +479,7 @@ function monsterSvg(mood) {
     if (!o.skins.length) o.skins = ['sk_dawn'];
     if (typeof o.coins !== 'number' || o.coins < 0) o.coins = 0;
     if (!o.contract || typeof o.contract !== 'object') o.contract = null;
+    if (!o.undo || typeof o.undo !== 'object' || !o.undo.data) o.undo = null;
     Object.keys(o.nights).forEach(function (k) {
       var n = o.nights[k] || {};
       if (typeof n !== 'object') n = {};
@@ -498,6 +512,34 @@ function monsterSvg(mood) {
   function save() {
     try { localStorage.setItem(KEY, JSON.stringify(state)); return true; }
     catch (e) { toast('记录没能保存，请检查浏览器存储设置'); return false; }
+  }
+
+  /* ---------- 点错了也能撤回 ---------- */
+  function snapshot(label) {
+    var copy = JSON.parse(JSON.stringify(state));
+    delete copy.undo;
+    state.undo = { label: label, at: Date.now(), data: copy };
+  }
+  function doUndo() {
+    if (!state.undo || !state.undo.data) { toast('目前没有可以撤回的操作'); return; }
+    var label = state.undo.label, d = state.undo.data;
+    d.undo = null;
+    state = normalize(d);
+    save(); closeModal(); renderAll();
+    toast('已经撤回「' + label + '」');
+  }
+  function hasBackup() {
+    try { return !!localStorage.getItem(KEY + '_backup'); } catch (e) { return false; }
+  }
+  function restoreBackup() {
+    try {
+      var raw = localStorage.getItem(KEY + '_backup');
+      if (!raw) { toast('没有找到备份'); return; }
+      var d = JSON.parse(raw);
+      d.undo = null;
+      state = normalize(d);
+      save(); renderAll(); toast('清空前的记录找回来了');
+    } catch (e) { toast('备份读不出来'); }
   }
 
   /* ---------- 归日：跨午夜必须落在同一个「夜」 ---------- */
@@ -628,6 +670,7 @@ function monsterSvg(mood) {
   function doSleep() {
     var k = currentNightKey(), n = ensureNight(k);
     if (n.sleepTs) { toast('这一夜已经记下啦 · ' + n.sleepHM); return; }
+    snapshot('记下入睡时间');
     n.sleepTs = Date.now(); n.sleepHM = hm(n.sleepTs);
     addCoin(k, 'sleep'); syncUnlocks(); save(); renderAll();
     toast('已记下 · ' + n.sleepHM + '，晚安');
@@ -636,6 +679,7 @@ function monsterSvg(mood) {
     var open = openNightKey();
     var k = open || activeNightKey(), n = ensureNight(k);
     if (n.wakeTs) { toast('今早已经记下啦 · ' + n.wakeHM); return; }
+    snapshot('记下醒来时间');
     n.wakeTs = Date.now(); n.wakeHM = hm(n.wakeTs);
     addCoin(k, 'wake'); syncUnlocks(); save(); renderAll();
     toast('早，光已经进来了 · ' + n.wakeHM);
@@ -643,6 +687,7 @@ function monsterSvg(mood) {
   function doQuest() {
     var k = currentNightKey(), n = ensureNight(k);
     if (n.questDone) { toast('这一片已经收下啦'); return; }
+    snapshot('收下睡眠碎片');
     var q = questOf(k);
     n.questId = q.id; n.questDone = true;
     if (state.fragments.indexOf(q.id) < 0) state.fragments.push(q.id);
@@ -672,7 +717,7 @@ function monsterSvg(mood) {
     var room = state.settings.roommateOn ? roomLineOf(k, state.settings.roommate) : null;
     var h = [];
 
-    h.push('<div class="hero">');
+    h.push('<div class="hero">' + MOON_SVG);
     h.push('<div class="hero-top"><span class="phase-tag">' + pt.tag + '</span><span class="hero-date">' + md(k) + ' · ' + wd(k) + '这一夜</span></div>');
     h.push('<div class="monster-wrap">' + monsterSvg(mood) + '</div>');
     h.push('<h1 class="hero-title">' + esc(pt.title) + '</h1>');
@@ -879,6 +924,7 @@ function monsterSvg(mood) {
     h.push('<div class="btn-row"><button class="btn-ghost" data-act="export" type="button">导出 JSON</button>'
       + '<button class="btn-ghost" data-act="import" type="button">导入 JSON</button></div>');
     h.push('<button class="link-btn danger-link" data-act="clearConfirm" type="button">清空全部记录</button>');
+    if (hasBackup()) h.push('<button class="link-btn" data-act="restoreBackup" type="button">找回清空前的记录</button>');
     h.push('</div>');
 
     h.push('<p class="privacy">星眠小站 · 零依赖单文件网页 App<br>不联网、不上传、不需要账号，关掉也不会丢。</p>');
@@ -907,6 +953,7 @@ function monsterSvg(mood) {
     openModal('改一下这一夜的时间', body, foot);
   }
   function saveTime(k) {
+    snapshot('改这一夜的时间');
     var n = ensureNight(k), sv = el('mSleep').value, wv = el('mWake').value;
     if (sv) { n.sleepTs = tsSleepFrom(k, sv); n.sleepHM = sv; addCoin(k, 'sleep'); }
     else { n.sleepTs = null; n.sleepHM = ''; }
@@ -927,6 +974,7 @@ function monsterSvg(mood) {
   function saveBack() {
     var k = el('bDate').value;
     if (!k) { toast('先选一个日期'); return; }
+    snapshot('补记一夜');
     var n = ensureNight(k), sv = el('bSleep').value, wv = el('bWake').value;
     n.manual = true;
     if (sv) { n.sleepTs = tsSleepFrom(k, sv); n.sleepHM = sv; }
@@ -934,6 +982,7 @@ function monsterSvg(mood) {
     syncUnlocks(); save(); closeModal(); renderAll(); toast('补上了，这一夜留下来了');
   }
   function genVoucher() {
+    snapshot('生成一句话契约');
     var c = state.contract || {};
     c.stake = el('stakeInput').value.trim();
     c.witness = el('witnessInput').value.trim();
@@ -981,7 +1030,7 @@ function monsterSvg(mood) {
     } catch (e) { toast('导出没成功，可以试试导入导出之外的备份方式'); }
   }
   function clearConfirmModal() {
-    var body = '<p class="hint">记录只在这台设备上，清空之后就找不回来了。梦境币、碎片、凭证也会一起清空。</p>';
+    var body = '<p class="hint">会先自动留一份本机备份。清空后随时能一键撤回，或在「我的」里找回备份，不会真的丢。</p>';
     var foot = '<button class="btn-ghost" data-act="closeModal" type="button">再想想</button>'
       + '<button class="btn-primary" data-act="clearAll" type="button">确定清空</button>';
     openModal('要清空全部记录吗？', body, foot);
@@ -1005,9 +1054,13 @@ function monsterSvg(mood) {
     for (var i = 0; i < tabs.length; i++) tabs[i].classList.toggle('active', tabs[i].getAttribute('data-tab') === curTab);
     el('topbarRight').textContent = md(todayStr()) + ' · ' + wd(todayStr());
     var main = el('main');
-    main.innerHTML = curTab === 'today' ? renderToday()
+    var undoBar = state.undo
+      ? '<button class="undo-bar" data-act="undo" type="button">' + svg('edit', 'ic')
+        + '<span>点错了？撤回上一步「' + esc(state.undo.label) + '」</span></button>'
+      : '';
+    main.innerHTML = undoBar + (curTab === 'today' ? renderToday()
       : curTab === 'log' ? renderLog()
-      : curTab === 'collection' ? renderCollection() : renderSettings();
+      : curTab === 'collection' ? renderCollection() : renderSettings());
     main.classList.remove('fade-in');
     void main.offsetWidth;
     main.classList.add('fade-in');
@@ -1034,7 +1087,10 @@ function monsterSvg(mood) {
       case 'viewVoucher': viewVoucher(id); break;
       case 'copyVoucher': copyText(el('voucherText') ? el('voucherText').textContent : ''); break;
       case 'closeModal': closeModal(); break;
+      case 'undo': doUndo(); break;
+      case 'restoreBackup': restoreBackup(); break;
       case 'useSkin':
+        snapshot('换主题');
         state.settings.theme = SKIN_CLASS[id] || 'dawn';
         save(); renderAll(); toast('换好啦'); break;
       case 'addReward':
@@ -1042,16 +1098,23 @@ function monsterSvg(mood) {
         var rn = parseInt(el('rewardNeed').value, 10);
         if (!rt) { toast('先写一句想给自己的话'); break; }
         if (!rn || rn < 1) rn = 10;
+        snapshot('加一张奖励券');
         state.rewards.push({ id: 'r' + Date.now(), text: rt, need: rn, redeemed: false });
         save(); renderAll(); toast('奖励券加好了'); break;
       case 'redeem':
+        snapshot('领奖励券');
         state.rewards.forEach(function (r) { if (r.id === id && state.coins >= r.need) r.redeemed = true; });
         save(); renderAll(); toast('领好啦，记得真的去用'); break;
       case 'export': exportData(); break;
       case 'import': el('importFile').click(); break;
       case 'clearConfirm': clearConfirmModal(); break;
       case 'clearAll':
-        state = blank(); save(); closeModal(); go('today'); toast('已经清空，可以重新开始了'); break;
+        var old = JSON.parse(JSON.stringify(state));
+        delete old.undo;
+        try { localStorage.setItem(KEY + '_backup', JSON.stringify(old)); } catch (err) { /* noop */ }
+        state = blank();
+        state.undo = { label: '清空全部记录', at: Date.now(), data: old };
+        save(); closeModal(); go('today'); toast('已经清空，随时可以撤回'); break;
       default: break;
     }
   });
@@ -1066,7 +1129,11 @@ function monsterSvg(mood) {
         try {
           var o = JSON.parse(reader.result);
           if (!o || typeof o !== 'object' || !o.nights) throw new Error('bad');
-          state = normalize(o); save(); renderAll(); toast('导入好了');
+          snapshot('导入记录');
+          var keptUndo = state.undo;
+          state = normalize(o);
+          state.undo = keptUndo;
+          save(); renderAll(); toast('导入好了');
         } catch (err) { toast('这个文件读不出来，换一个试试'); }
       };
       reader.readAsText(f);
