@@ -91,6 +91,35 @@ button { -webkit-tap-highlight-color: transparent; }
 }
 .undo-bar .ic { width: 15px; height: 15px; }
 .undo-bar:active { transform: scale(.99); }
+/* 常驻「改记录」入口：比即时撤回条更低调，但四个页签始终可见 */
+.fix-bar {
+  display: flex; align-items: center; gap: 8px; width: 100%; margin: 0 0 12px; padding: 9px 14px;
+  background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .16);
+  border-radius: 12px; color: #D7DDEE; font-size: 12px; text-align: left; cursor: pointer;
+}
+.fix-bar .ic { width: 14px; height: 14px; color: #CBB8E8; flex: none; }
+.fix-bar > span:not(.fix-arrow) { flex: 1; }
+.fix-arrow { color: #C9C0E0; font-size: 18px; line-height: 1; flex: none; }
+.fix-bar:active { background: rgba(255, 255, 255, .12); }
+/* 选一夜列表 */
+.fix-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 11px 12px; margin-bottom: 8px;
+  background: #FFFCF7; border: 1px solid #EDE6F3; border-radius: 12px; color: #3A3555; font-size: 13px; cursor: pointer; text-align: left; }
+.fix-row > span:first-child { flex: 1; white-space: nowrap; }
+.fix-row small { font-size: 11px; color: #8A8CA0; white-space: nowrap; }
+.fix-row .fix-arrow { color: #9A86C4; }
+/* 编辑弹层：时间输入 + 清空 */
+.edit-line { display: flex; align-items: center; gap: 8px; }
+.edit-line .field { flex: 1; min-width: 0; margin-bottom: 12px; }
+.mini-clear { flex: none; background: #F1ECF7; border: 1px solid #E3DAEE; color: #6C5A8E; border-radius: 10px;
+  font-size: 12px; padding: 8px 10px; cursor: pointer; margin-bottom: 12px; white-space: nowrap; }
+.mini-clear:active { background: #E7DDF3; }
+/* 夜记卡片里的「改这一夜」 */
+.night-edit { margin-left: auto; background: none; border: 0; color: #7A6BA8; font-size: 11px; cursor: pointer; padding: 2px 0; white-space: nowrap; }
+/* 帮助卡 */
+.help-item { padding: 8px 0; border-bottom: 1px solid #F0ECF4; }
+.help-item:last-child { border-bottom: 0; }
+.help-item b { display: block; font-size: 13px; color: #3A3555; margin-bottom: 2px; }
+.help-item span { font-size: 12px; color: #787D91; line-height: 1.6; }
 
 /* 卡片 */
 .card { background: #FFF8EE; color: #2C3550; border-radius: 20px; padding: 16px 16px 15px; margin-bottom: 14px; box-shadow: 0 6px 20px rgba(14, 22, 48, .18); }
@@ -264,6 +293,7 @@ var ICONS = {
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5.5l3.5 2"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   edit: '<path d="M4 20h4l10-10-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/>',
+  undo: '<path d="M4 9h10a6 6 0 1 1-6 6"/><path d="M4 9l4-4M4 9l4 4"/>',
   close: '<path d="M6 6l12 12M18 6 6 18"/>',
   heart: '<path d="M12 20s-7.5-4.7-7.5-9.3A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.7C19.5 15.3 12 20 12 20Z"/>',
   shield: '<path d="M12 3 4.5 6v6c0 4.6 3.1 7.7 7.5 9 4.4-1.3 7.5-4.4 7.5-9V6L12 3Z"/><path d="m9 12 2 2 4-4"/>',
@@ -430,6 +460,7 @@ function monsterSvg(mood) {
   'use strict';
 
   var KEY = 'xingmian_v1';
+  var APP_VER = 'v2 · 11-13';
   var TABS = ['today', 'log', 'collection', 'settings'];
   var WD = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
   var HOUR = 3600 * 1000;
@@ -730,7 +761,7 @@ function monsterSvg(mood) {
     h.push(actionBtn('wake', '醒来', n.wakeTs ? hm(n.wakeTs) : null, 'sparkle'));
     h.push('</div>');
     h.push('<div class="row-note"><span>' + (n.sleepTs || n.wakeTs ? esc(passLabel(n)) : '点一下就好，早晚都算数。') + '</span>'
-      + '<button class="link-btn" data-act="editTime" type="button">改时间</button></div>');
+      + '<button class="link-btn" data-act="editNight" data-id="' + esc(k) + '" type="button">点错了？改这一夜</button></div>');
 
     h.push('<div class="card quest-card">');
     h.push(cardHead('sparkle', '晨间寻宝', '今天'));
@@ -793,7 +824,8 @@ function monsterSvg(mood) {
           + '<span>' + svg('sparkle', 'ic') + '醒来 ' + (n.wakeHM || '—') + '</span></div>');
         if (q) h.push('<p class="night-quest">' + (n.questDone ? '收下碎片 · ' : '今日寻宝 · ') + esc(q.text) + '</p>');
         h.push('<div class="night-foot"><span>梦境币 +' + (n.coins || 0) + '</span>'
-          + (n.manual ? '<span>补记</span>' : '') + '</div>');
+          + (n.manual ? '<span>补记</span>' : '')
+          + '<button class="night-edit" data-act="editNight" data-id="' + esc(k) + '" type="button">改这一夜 ›</button></div>');
         h.push('</div>');
       });
       if (keys.length > 60) h.push('<p class="list-end">只显示最近 60 夜</p>');
@@ -888,6 +920,13 @@ function monsterSvg(mood) {
   function renderSettings() {
     var s = state.settings, c = state.contract || {};
     var h = [];
+    h.push('<div class="card help-card">');
+    h.push(cardHead('shield', '点错了怎么办', '随时能改'));
+    h.push('<div class="help-item"><b>改这一夜</b><span>每页顶部的「改记录」，或「今晚」/「夜记」里点某一夜，都能清空误点的时间、取消碎片、删掉整夜。</span></div>');
+    h.push('<div class="help-item"><b>撤回上一步</b><span>刚点完，顶部会浮出一条「撤回上一步」，点一下就回到操作前。</span></div>');
+    h.push('<div class="help-item"><b>清空也不怕</b><span>清空全部会自动备份，随时在这里「找回清空前的记录」。这里没有惩罚，误点了只需改一笔，什么都不用补。</span></div>');
+    h.push('</div>');
+
     h.push('<div class="card">');
     h.push(cardHead('clock', '目标时间', '可随时改'));
     h.push('<label class="field-label">打算几点前入睡</label><input class="field" type="time" data-set="bedTarget" value="' + esc(s.bedTarget) + '">');
@@ -927,7 +966,7 @@ function monsterSvg(mood) {
     if (hasBackup()) h.push('<button class="link-btn" data-act="restoreBackup" type="button">找回清空前的记录</button>');
     h.push('</div>');
 
-    h.push('<p class="privacy">星眠小站 · 零依赖单文件网页 App<br>不联网、不上传、不需要账号，关掉也不会丢。</p>');
+    h.push('<p class="privacy">星眠小站 · ' + esc(APP_VER) + ' · 零依赖单文件网页 App<br>不联网、不上传、不需要账号，关掉也不会丢。</p>');
     return h.join('');
   }
 
@@ -943,23 +982,56 @@ function monsterSvg(mood) {
   }
   function closeModal() { var root = el('modalRoot'); root.className = 'hidden'; root.innerHTML = ''; }
 
-  function editTimeModal() {
-    var k = currentNightKey(), n = getNight(k) || {};
-    var body = '<label class="field-label">入睡时间</label><input class="field" id="mSleep" type="time" value="' + esc(n.sleepHM || '') + '">'
-      + '<label class="field-label">醒来时间</label><input class="field" id="mWake" type="time" value="' + esc(n.wakeHM || '') + '">'
-      + '<p class="hint">留空就表示还没记。改时间不会动已经攒下的梦境币。</p>';
-    var foot = '<button class="btn-ghost" data-act="closeModal" type="button">取消</button>'
-      + '<button class="btn-primary" data-act="saveTime" data-k="' + esc(k) + '" type="button">记下</button>';
-    openModal('改一下这一夜的时间', body, foot);
+  /* 「改这一夜」：任意一夜都能改，可清空误点、取消碎片、删掉整夜，改动本身也可撤回 */
+  function editNightModal(k) {
+    k = k || currentNightKey();
+    var n = getNight(k) || {};
+    var q = QUESTS.filter(function (x) { return x.id === n.questId; })[0] || questOf(k);
+    var body = '<p class="hint">' + esc(md(k)) + ' · ' + esc(wd(k)) + '这一夜。误点了没关系，想改哪一项都行，改完顶部还能再撤回。</p>'
+      + '<label class="field-label">入睡时间（清空＝撤掉这次入睡）</label>'
+      + '<div class="edit-line"><input class="field" id="mSleep" type="time" value="' + esc(n.sleepHM || '') + '">'
+      + (n.sleepTs ? '<button class="mini-clear" data-act="clearField" data-field="mSleep" type="button">清空</button>' : '') + '</div>'
+      + '<label class="field-label">醒来时间（清空＝撤掉这次醒来）</label>'
+      + '<div class="edit-line"><input class="field" id="mWake" type="time" value="' + esc(n.wakeHM || '') + '">'
+      + (n.wakeTs ? '<button class="mini-clear" data-act="clearField" data-field="mWake" type="button">清空</button>' : '') + '</div>'
+      + (n.questDone ? '<label class="switch-row"><span>收下睡眠碎片「' + esc(q.text) + '」</span>'
+        + '<input type="checkbox" id="mQuest" checked></label>' : '')
+      + '<p class="hint">取消勾选＝撤下这次碎片。已经攒下的梦境币、贴纸、皮肤只加不减，改这些不会扣掉。</p>';
+    var foot = '<button class="btn-ghost" data-act="delNight" data-id="' + esc(k) + '" type="button">删掉这一整夜</button>'
+      + '<button class="btn-primary" data-act="saveNight" data-k="' + esc(k) + '" type="button">记下</button>';
+    openModal('改这一夜', body, foot);
   }
-  function saveTime(k) {
-    snapshot('改这一夜的时间');
-    var n = ensureNight(k), sv = el('mSleep').value, wv = el('mWake').value;
-    if (sv) { n.sleepTs = tsSleepFrom(k, sv); n.sleepHM = sv; addCoin(k, 'sleep'); }
+  function saveNight(k) {
+    snapshot('改这一夜');
+    var n = ensureNight(k), sv = el('mSleep').value, wv = el('mWake').value, mq = el('mQuest');
+    if (sv) { n.sleepTs = tsSleepFrom(k, sv); n.sleepHM = sv; }
     else { n.sleepTs = null; n.sleepHM = ''; }
-    if (wv) { n.wakeTs = tsWakeFrom(k, wv); n.wakeHM = wv; addCoin(k, 'wake'); }
+    if (wv) { n.wakeTs = tsWakeFrom(k, wv); n.wakeHM = wv; }
     else { n.wakeTs = null; n.wakeHM = ''; }
-    syncUnlocks(); save(); closeModal(); renderAll(); toast('时间记好了');
+    if (mq && !mq.checked) { n.questDone = false; n.questId = ''; }
+    if (!traced(n)) delete state.nights[k];
+    syncUnlocks(); save(); closeModal(); renderAll(); toast('改好了，顶部还能再撤回');
+  }
+  function delNight(k) {
+    if (state.nights[k]) {
+      snapshot('删掉这一整夜');
+      delete state.nights[k];
+      syncUnlocks(); save(); closeModal(); renderAll(); toast('这一夜删掉了，顶部还能撤回');
+    } else { closeModal(); }
+  }
+  function openFixModal() {
+    var keys = Object.keys(state.nights).filter(function (k) { return traced(state.nights[k]); }).sort().reverse();
+    var body = '<p class="hint">点错了不用慌，这里没有惩罚。选一夜就能改时间、取消碎片，或删掉整夜；清空全部也有备份。改完任意一步，页面顶部都会出现「撤回」。</p>';
+    if (!keys.length) body += '<p class="hint">目前还没有夜记录，去「今晚」点一下就有啦。</p>';
+    keys.slice(0, 30).forEach(function (k) {
+      var n = state.nights[k];
+      body += '<button class="fix-row" data-act="editNight" data-id="' + esc(k) + '" type="button">'
+        + '<span>' + esc(md(k)) + ' · ' + esc(wd(k)) + '</span>'
+        + '<small>' + esc((n.sleepHM || '—') + ' → ' + (n.wakeHM || '—')) + '</small>'
+        + '<span class="fix-arrow">›</span></button>';
+    });
+    var foot = '<button class="btn-ghost" data-act="closeModal" type="button">先不改</button>';
+    openModal('改记录 · 选一夜', body, foot);
   }
   function addBackModal() {
     var yesterday = addDays(activeNightKey(), -1);
@@ -1054,11 +1126,14 @@ function monsterSvg(mood) {
     for (var i = 0; i < tabs.length; i++) tabs[i].classList.toggle('active', tabs[i].getAttribute('data-tab') === curTab);
     el('topbarRight').textContent = md(todayStr()) + ' · ' + wd(todayStr());
     var main = el('main');
-    var undoBar = state.undo
-      ? '<button class="undo-bar" data-act="undo" type="button">' + svg('edit', 'ic')
+    var bars = state.undo
+      ? '<button class="undo-bar" data-act="undo" type="button">' + svg('undo', 'ic')
         + '<span>点错了？撤回上一步「' + esc(state.undo.label) + '」</span></button>'
       : '';
-    main.innerHTML = undoBar + (curTab === 'today' ? renderToday()
+    /* 常驻入口：四个页签都在，不依赖「刚操作过」，随时能改任意一夜 */
+    bars += '<button class="fix-bar" data-act="openFix" type="button">' + svg('edit', 'ic')
+      + '<span>改记录 · 点错了随时能改</span><span class="fix-arrow">›</span></button>';
+    main.innerHTML = bars + (curTab === 'today' ? renderToday()
       : curTab === 'log' ? renderLog()
       : curTab === 'collection' ? renderCollection() : renderSettings());
     main.classList.remove('fade-in');
@@ -1079,8 +1154,14 @@ function monsterSvg(mood) {
       case 'sleep': doSleep(); break;
       case 'wake': doWake(); break;
       case 'quest': doQuest(); break;
-      case 'editTime': editTimeModal(); break;
-      case 'saveTime': saveTime(btn.getAttribute('data-k')); break;
+      case 'editNight': editNightModal(id); break;
+      case 'openFix': openFixModal(); break;
+      case 'saveNight': saveNight(btn.getAttribute('data-k')); break;
+      case 'delNight': delNight(id); break;
+      case 'clearField':
+        var cf = el(btn.getAttribute('data-field'));
+        if (cf) { cf.value = ''; toast('已清空，点「记下」生效'); }
+        break;
       case 'addBack': addBackModal(); break;
       case 'saveBack': saveBack(); break;
       case 'genVoucher': genVoucher(); break;
