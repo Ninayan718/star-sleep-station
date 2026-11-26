@@ -505,7 +505,7 @@ function petPhoto(petId, mood) {
     h.push('<label class="field-label" for="petName">它叫什么</label>'
       + '<input class="field" id="petName" data-act="name" maxlength="12" value="' + esc(state.name) + '">');
     h.push('<label class="field-label" for="tuckTime">它几点困</label>'
-      + '<input class="field" id="tuckTime" data-act="tuck" type="time" value="' + esc(state.tuckTime) + '">');
+      + '<input class="field" id="tuckTime" data-act="tuckTime" type="time" value="' + esc(state.tuckTime) + '">');
     h.push('<p class="hint">到了这个点，它会先打哈欠。没到也没关系，你提前送它睡照样记。</p></div>');
 
     h.push('<div class="card"><div class="card-head">' + svg('clock', 'ic') + '记录</div>');
@@ -652,7 +652,7 @@ function petPhoto(petId, mood) {
     if (a === 'name') {
       state.name = (t.value || '小眠').trim().slice(0, 12) || '小眠';
       save(); renderAll(); toast('记住啦');
-    } else if (a === 'tuck') {
+    } else if (a === 'tuckTime') {
       if (/^\d{1,2}:\d{2}$/.test(t.value)) { state.tuckTime = t.value; save(); toast('到点它会先困'); }
     }
   });
