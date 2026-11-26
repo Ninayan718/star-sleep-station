@@ -292,7 +292,7 @@ function petPhoto(petId, mood) {
   function hm(ts) { var d = new Date(ts); return pad(d.getHours()) + ':' + pad(d.getMinutes()); }
   function minOf(hhmm) { var p = String(hhmm || '00:00').split(':'); return (+p[0]) * 60 + (+p[1] || 0); }
   function nowMin() { var d = new Date(); return d.getHours() * 60 + d.getMinutes(); }
-  function nightKeyOf(ts) { var d = new Date(ts); if (d.getHours() < 12) d.setDate(d.getDate() - 1); return ymd(d); }
+  function nightKeyOf(ts) { var d = new Date(ts); if (d.getHours() < 4) d.setDate(d.getDate() - 1); return ymd(d); }
 
   function fresh() { return { v: 1, name: '小眠', pet: 'cat', tuckTime: '22:30', theme: 'dawn', nights: {} }; }
 
@@ -371,8 +371,14 @@ function petPhoto(petId, mood) {
   function moodOf() {
     var k = nightKeyOf(Date.now()), n = state.nights[k];
     if (n && n.tuckedAt) return 'curl';
-    /* 只在中午前、且昨夜没哄时"有点蔫"；睡前绝不出现，避免增加入睡负担 */
-    if (new Date().getHours() < 12 && k !== todayStr() && !n) return 'sleepy';
+    /* 只在早上（4-11点）检查"昨晚那一夜"有没有哄，没哄就"有点蔫"；
+       睡前（中午后）绝不出现，避免增加入睡负担 */
+    var hr = new Date().getHours();
+    if (hr >= 4 && hr < 12) {
+      var lastNight = addDays(todayStr(), -1);
+      var ln = state.nights[lastNight];
+      if (!ln || !ln.tuckedAt) return 'sleepy';
+    }
     if (nowMin() >= minOf(state.tuckTime)) return 'yawn';
     return 'company';
   }
